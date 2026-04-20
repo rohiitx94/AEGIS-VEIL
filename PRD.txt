@@ -1,0 +1,76 @@
+Here is the complete blueprint for Stego-Cloud, tailored strictly to what you requested.
+1. ObjectivesPrimary: To create a secure, invisible cloud storage system where sensitive files are hidden within standard image files using LSB (Least Significant Bit) steganography.
+2. Secondary: To provide a zero-knowledge architecture using AES-256 encryption, ensuring that even if the host server is compromised, the data remains unreadable.
+3. Tertiary: To design a deceptive user interface (a "Fake Gallery") that provides plausible deniability to the user in case of physical coercion.
+
+
+2. Drawbacks of Existing WorkObvious Encryption: Standard tools (like Google Drive, OneDrive, or even encrypted zips) show that a file exists. If an attacker sees an encrypted folder named taxes_2026.zip, they know exactly what to target.
+1.Poor UI/UX: Existing steganography projects are mostly command-line interfaces (CLI) or ugly desktop software built for academic purposes. They lack a modern, web-based cloud experience.
+2. Lack of Plausible Deniability: No mainstream system has a "Panic Mode" where a secondary password unlocks a completely different set of harmless files to fool an attacker.
+3. No Decentralized/Cloud Integration: Current tools process images locally but don't manage the cloud storage, authentication, and retrieval pipeline seamlessly.
+
+
+3. Proposed Solution: Stego-CloudA web-based SaaS application that looks and behaves exactly like a personal photo gallery (like Google Photos).Under the hood, it is a cryptographic vault. Before a user uploads a sensitive document (like a PDF or text file), the system encrypts the document using AES-256. It then breaks the encrypted binary down and injects it into the invisible least significant bits of a high-resolution carrier image (e.g., a landscape photo). The resulting image looks visually identical to the original and is stored in the cloud. To retrieve the file, the user inputs their password, the system extracts the bits, decrypts them, and reassembles the original file.
+
+4. User Input / Output  
+Scenario A: Uploading (Hiding Data)Input:
+1. The Secret File (e.g., passwords.txt)
+2. The Carrier Image (e.g., sunset.png - or the system auto-provides one)
+3. The User's Encryption Key (Password)Output: A newly generated sunset.png that contains the hidden file. (The original passwords.txt is destroyed from memory).
+
+Scenario B: Downloading (Extracting Data)
+Input:The Stego-Image (sunset.png) clicked from the web gallery.The User's Encryption Key (Password).
+Output: The extracted and decrypted passwords.txt downloaded directly to the user's machine.
+
+5. Use CasesJournalists & Whistleblowers: Smuggling sensitive documents across borders where laptops/phones might be physically searched by authorities.
+1.Corporate IP Protection: Executives storing top-secret trade secrets or patents in a way that avoids corporate espionage.
+2.Personal Privacy: Individuals who want to store personal crypto-wallet recovery phrases or private documents without trusting standard cloud providers.
+
+6. Tech StackSince you are building a modern web app, this stack perfectly balances a fast UI with heavy backend image processing:
+1.Frontend: Next.js / React (For the UI, drag-and-drop zones, and the "Gallery" interface).
+2.Backend: FastAPI (Python). Why? Python is significantly better and faster at handling binary math, image arrays, and cryptography (using libraries like OpenCV, Pillow, and PyCryptodome) than Node.js.
+3.Database & Auth: Supabase (To manage user logins and store the metadata—e.g., which user owns which image).
+4.Storage: AWS S3 or Supabase Storage (To store the actual generated stego-images).
+
+7. Architectural Diagram (Data Flow)Plaintext[ USER BROWSER ] 
+       │
+       ├─► 1. User uploads Secret File + Password via React UI.
+       │
+[ FASTAPI BACKEND ]
+       │
+       ├─► 2. Crypto Engine: Encrypts Secret File via AES-256.
+       │
+       ├─► 3. Stego Engine: Converts encrypted data to Binary.
+       │                    Injects Binary into Image Pixels (LSB).
+       │
+[ CLOUD INFRASTRUCTURE ]
+       │
+       ├─► 4. Storage Bucket: Saves the new "Stego-Image.png".
+       │
+       └─► 5. Supabase DB: Logs image metadata to the User's account.
+
+(Retrieval is the exact reverse of this flow)
+
+
+8. How You Are Going to Build This (The Roadmap)We will build this in 4 distinct sprints:
+
+Sprint 1: The Core Algorithm (Python script). We will write a pure Python script that can take a text file, encrypt it, hide it in an image, and extract it back. No web stuff yet. Just proving the math works.
+
+Sprint 2: The API (FastAPI). We will wrap your Python script into API endpoints (/upload-secret, /extract-secret).
+
+Sprint 3: The UI (Next.js/React). You will build the "Fake Gallery" frontend. It should look clean, minimalist, and unsuspicious. Connect it to the API.
+
+Sprint 4: The "Wow" Features. We will implement the "Panic Password" (decoy gallery) and polish the UI for your college presentation.
+
+9. Extra Info (Crucial Engineering Constraint)
+Here is the one technical secret you need to know before we start: Payload Capacity.You cannot hide a 1GB movie inside a 2MB image.
+
+1.Every pixel in an image has 3 color channels (Red, Green, Blue).
+2.If we use the Last Significant Bit (LSB) of each channel, 1 pixel can hold 3 bits of hidden data.
+3.Therefore, a standard 4K Image (3840 x 2160 pixels) has about 8.2 million pixels.
+4.$8.2 \text{ million} \times 3 \text{ bits} = 24.8 \text{ million bits}$.
+5.$24.8 \text{ million bits} / 8 = 3.1 \text{ Megabytes}$.
+
+The Rule: Your carrier image must always be significantly larger (in resolution) than the file you are trying to hide. For a college project, we will focus on hiding text files, PDFs, or small documents inside high-res photos.
+
+Constraint: Please do this step-by-step. Do NOT write the entire app at once. 
