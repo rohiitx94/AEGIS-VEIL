@@ -61,27 +61,31 @@ def store_stego_image(
     if not dest_filename.endswith(".png"):
         dest_filename = dest_filename.rsplit(".", 1)[0] + ".png"
 
-    dest_path = settings.STEGO_DIR / dest_filename
+    storage_path = f"{user_id}/{vault_id}/{dest_filename}"
+    img_info = get_image_info(stego_image_path)
+    file_size_bytes = stego_image_path.stat().st_size
+    
+    # Upload to Supabase Storage
+    if supabase:
+        with open(stego_image_path, "rb") as f:
+            supabase.storage.from_("vault_images").upload(
+                path=storage_path,
+                file=f.read(),
+                file_options={"content-type": "image/png"}
+            )
 
-    # Copy stego-image to storage
-    shutil.copy2(stego_image_path, dest_path)
-
-    # Get image info
-    img_info = get_image_info(dest_path)
-
-    # Create metadata entry for DB
     entry = {
         "id": image_id,
         "user_id": user_id,
         "vault_id": vault_id,
         "filename": dest_filename,
         "original_name": original_carrier_name,
-        "path": str(dest_path),
+        "path": storage_path,
         "resolution": img_info["resolution"],
         "width": img_info["width"],
         "height": img_info["height"],
         "file_size": img_info["file_size"],
-        "file_size_bytes": dest_path.stat().st_size,
+        "file_size_bytes": file_size_bytes,
         "capacity": img_info["max_capacity"],
         "capacity_bytes": img_info["max_capacity_bytes"],
         "has_hidden_data": hidden_file_name is not None,
@@ -90,7 +94,6 @@ def store_stego_image(
         "hidden_file_size_bytes": hidden_file_size,
     }
 
-    # Save to Supabase
     if supabase:
         res = supabase.table("images").insert(entry).execute()
         if res.data:
@@ -120,10 +123,17 @@ def store_carrier_image(carrier_path: Path, user_id: str, vault_id: str, origina
     if not dest_filename.endswith(".png"):
         dest_filename = dest_filename.rsplit(".", 1)[0] + ".png"
 
-    dest_path = settings.CARRIER_DIR / dest_filename
+    storage_path = f"{user_id}/{vault_id}/{dest_filename}"
+    img_info = get_image_info(carrier_path)
+    file_size_bytes = carrier_path.stat().st_size
 
-    shutil.copy2(carrier_path, dest_path)
-    img_info = get_image_info(dest_path)
+    if supabase:
+        with open(carrier_path, "rb") as f:
+            supabase.storage.from_("vault_images").upload(
+                path=storage_path,
+                file=f.read(),
+                file_options={"content-type": "image/png"}
+            )
 
     entry = {
         "id": image_id,
@@ -131,12 +141,12 @@ def store_carrier_image(carrier_path: Path, user_id: str, vault_id: str, origina
         "vault_id": vault_id,
         "filename": dest_filename,
         "original_name": name,
-        "path": str(dest_path),
+        "path": storage_path,
         "resolution": img_info["resolution"],
         "width": img_info["width"],
         "height": img_info["height"],
         "file_size": img_info["file_size"],
-        "file_size_bytes": dest_path.stat().st_size,
+        "file_size_bytes": file_size_bytes,
         "capacity": img_info["max_capacity"],
         "capacity_bytes": img_info["max_capacity_bytes"],
         "has_hidden_data": False,
@@ -169,13 +179,28 @@ def get_image(image_id: str, user_id: str = None) -> Optional[Dict]:
 
 
 def get_image_path(image_id: str, user_id: str = None) -> Optional[Path]:
-    """Get the filesystem path for an image."""
+    """Download the image from Supabase Storage to a temporary file and return its path."""
     entry = get_image(image_id, user_id)
-    if entry:
-        path = Path(entry["path"])
-        if path.exists():
-            return path
-    return None
+    if not entry or not supabase:
+        return None
+    
+    storage_path = entry["path"]
+    
+    # Check if somehow it's a local path from older tests
+    if str(storage_path).startswith(str(settings.STEGO_DIR)) or str(storage_path).startswith(str(settings.CARRIER_DIR)):
+        if Path(storage_path).exists():
+            return Path(storage_path)
+
+    try:
+        data = supabase.storage.from_("vault_images").download(storage_path)
+        # Save to temp upload dir
+        temp_path = settings.UPLOAD_DIR / f"dl_{uuid.uuid4().hex[:8]}_{entry['filename']}"
+        temp_path.write_bytes(data)
+        return temp_path
+    except Exception as e:
+        import logging
+        logging.error(f"Failed to download image {image_id} from Supabase: {e}")
+        return None
 
 
 def list_images(user_id: str, vault_id: str = None, has_hidden_data: Optional[bool] = None) -> List[Dict]:
@@ -210,10 +235,18 @@ def delete_image(image_id: str, user_id: str = None) -> bool:
     if not entry:
         return False
 
-    # Delete file
-    path = Path(entry["path"])
-    if path.exists():
-        path.unlink()
+    # Delete file from Storage
+    storage_path = entry["path"]
+    # Check if local path (legacy)
+    if str(storage_path).startswith(str(settings.STEGO_DIR)) or str(storage_path).startswith(str(settings.CARRIER_DIR)):
+        if Path(storage_path).exists():
+            Path(storage_path).unlink()
+    else:
+        try:
+            supabase.storage.from_("vault_images").remove([storage_path])
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to remove {storage_path} from bucket: {e}")
 
     # Remove from DB
     q = supabase.table("images").delete().eq("id", image_id)

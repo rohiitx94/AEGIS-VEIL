@@ -33,7 +33,7 @@ if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
         if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
             sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Depends, Header
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Depends, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -399,6 +399,8 @@ async def extract_secret(
             storage.cleanup_temp(image_path)
         elif image_id:
             storage.delete_image(image_id)
+            if image_path and "dl_" in image_path.name:
+                storage.cleanup_temp(image_path)
 
         return ExtractResponse(
             success=True,
@@ -475,6 +477,8 @@ async def check_capacity(image_id: str, vault_token_payload: dict = Depends(get_
         raise HTTPException(status_code=404, detail=f"Image '{image_id}' not found.")
 
     img_info = utils.get_image_info(image_path)
+    if "dl_" in image_path.name:
+        storage.cleanup_temp(image_path)
 
     return CapacityResponse(
         success=True,
@@ -528,13 +532,16 @@ async def generate_carrier(
 #  Serve Images
 # ──────────────────────────────────────────────
 @app.get("/api/images/{image_id}", tags=["Gallery"])
-async def get_image_file(image_id: str, vault_token_payload: dict = Depends(get_current_mode)):
+async def get_image_file(image_id: str, background_tasks: BackgroundTasks, vault_token_payload: dict = Depends(get_current_mode)):
     """Serve an image file (for gallery display)."""
     mode = vault_token_payload.get("mode")
     # Allow panic mode to view innocent images
     image_path = storage.get_image_path(image_id)
     if not image_path:
         raise HTTPException(status_code=404, detail=f"Image '{image_id}' not found.")
+
+    if "dl_" in image_path.name:
+        background_tasks.add_task(storage.cleanup_temp, image_path)
 
     return FileResponse(
         path=image_path,

@@ -1,5 +1,6 @@
 from postgrest import SyncPostgrestClient
 from gotrue import SyncGoTrueClient
+from storage3 import SyncStorageClient
 from api.config import settings
 import logging
 
@@ -19,9 +20,12 @@ class SimpleSupabase:
         self.postgrest = SyncPostgrestClient(f"{url}/rest/v1", headers=self.headers)
         # Initialize GoTrue (Auth)
         self.auth = SyncGoTrueClient(url=f"{url}/auth/v1", headers=self.headers)
+        # Initialize Storage (Buckets)
+        self.storage = SyncStorageClient(f"{url}/storage/v1", self.headers)
         
     def table(self, table_name):
         return self.postgrest.table(table_name)
+
 
 try:
     if settings.SUPABASE_URL and settings.SUPABASE_KEY:
