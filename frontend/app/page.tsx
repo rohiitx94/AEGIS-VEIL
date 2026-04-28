@@ -63,6 +63,11 @@ function DashboardScreen({ onLoginSuccess }: { onLoginSuccess: (mode: "real" | "
            setLoading(false);
         });
       }
+    }).catch(err => {
+      console.error("Supabase error:", err);
+      setError("Failed to connect to Supabase database. Please check your NEXT_PUBLIC_SUPABASE_URL.");
+      setHasPassword(false);
+      setLoading(false);
     });
   }, []);
 
