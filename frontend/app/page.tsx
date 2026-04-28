@@ -56,8 +56,10 @@ function DashboardScreen({ onLoginSuccess }: { onLoginSuccess: (mode: "real" | "
         checkVaultStatus().then(res => {
            setHasPassword(res.has_password);
            setLoading(false);
-        }).catch(() => {
-           setError("Failed to verify vault status.");
+        }).catch((e) => {
+           console.error("Vault status error:", e);
+           setError("Failed to connect to backend. Please check your NEXT_PUBLIC_API_URL.");
+           setHasPassword(false);
            setLoading(false);
         });
       }
