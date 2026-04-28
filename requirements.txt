@@ -8,7 +8,7 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 python-multipart>=0.0.9
 python-dotenv>=1.0.0
-supabase>=2.11.0
+supabase==2.15.0
 PyJWT>=2.8.0
 httpx<0.28
 websockets<16
