@@ -45,7 +45,7 @@ class Settings:
     MAX_CARRIER_RESOLUTION: int = int(os.getenv("MAX_CARRIER_RESOLUTION", "8294400"))  # 4K = 3840*2160
 
     # ── CORS ──
-    CORS_ORIGINS: list = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+    CORS_ORIGINS: list = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",") if o.strip()]
 
     def __init__(self):
         """Create required directories on init."""
